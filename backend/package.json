@@ -1,0 +1,27 @@
+{
+  "dependencies": {
+    "@aws-sdk/client-polly": "^3.835.0",
+    "@aws-sdk/client-transcribe-streaming": "^3.835.0",
+    "@langchain/anthropic": "^0.3.23",
+    "@langchain/aws": "^0.1.11",
+    "@langchain/community": "^0.0.45",
+    "alawmulaw": "^6.0.0",
+    "dotenv": "^16.5.0",
+    "env-cmd": "^10.1.0",
+    "langchain": "^0.1.14",
+    "openai": "^4.25.0",
+    "pdf-parse": "^1.1.1",
+    "ws": "^8.13.0"
+  },
+  "name": "hack",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "env-cmd -f .env node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "type": "module"
+}
