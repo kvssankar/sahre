@@ -1,53 +1,81 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
+
+interface Transcript {
+  text: string;
+  isFinal: boolean;
+}
+
+interface Suggestion {
+  title: string;
+  content: string;
+}
 
 function App() {
-  const [audioFile, setAudioFile] = useState(null);
-  const [audioUrl, setAudioUrl] = useState("");
-  const [transcripts, setTranscripts] = useState([]);
-  const [suggestions, setSuggestions] = useState([]);
-  const wsRef = useRef(null);
-  const audioRef = useRef(null);
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string>("");
+  const [transcripts, setTranscripts] = useState<Transcript[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const wsRef = useRef<WebSocket | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
+  useEffect(() => {
+    // Cleanup WebSocket on unmount or when audioFile changes
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [audioFile]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
     setAudioFile(file);
-    setAudioUrl(URL.createObjectURL(file));
+    setAudioUrl(file ? URL.createObjectURL(file) : "");
     setTranscripts([]);
     setSuggestions([]);
+    // Close previous WebSocket if any
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
   };
 
   const handlePlay = () => {
     if (!audioFile) return;
     wsRef.current = new WebSocket("ws://localhost:8080");
-    wsRef.current.onmessage = (event) => {
+    wsRef.current.onmessage = (event: MessageEvent) => {
       const data = JSON.parse(event.data);
       if (data.type === "suggestions") {
         setSuggestions((prev) => [...prev, ...data.suggestions]);
-      } else {
+      } else if (data.transcript !== undefined) {
         setTranscripts((prev) => [...prev, { text: data.transcript, isFinal: data.isFinal }]);
       }
     };
 
-    // Read and send audio file in chunks as it plays
-    const chunkSize = 32000; // ~0.5s at 64kbps
-    const reader = new FileReader();
-    let offset = 0;
+    wsRef.current.onopen = () => {
+      // Read and send audio file in chunks as it plays
+      const chunkSize = 32000; // ~0.5s at 64kbps
+      const reader = new FileReader();
+      let offset = 0;
 
-    function sendChunk() {
-      if (offset >= audioFile.size) return;
-      const slice = audioFile.slice(offset, offset + chunkSize);
-      reader.readAsArrayBuffer(slice);
-    }
-
-    reader.onload = function (e) {
-      if (wsRef.current.readyState === 1) {
-        wsRef.current.send(e.target.result);
-        offset += chunkSize;
-        setTimeout(sendChunk, 250); // send next chunk after 250ms
+      function sendChunk() {
+        if (!audioFile || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        if (offset >= audioFile.size) return;
+        const slice = audioFile.slice(offset, offset + chunkSize);
+        reader.readAsArrayBuffer(slice);
       }
-    };
 
-    sendChunk();
+      reader.onload = function (e) {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && e.target?.result) {
+          wsRef.current.send(e.target.result as ArrayBuffer);
+          offset += chunkSize;
+          setTimeout(sendChunk, 250); // send next chunk after 250ms
+        }
+      };
+
+      sendChunk();
+    };
   };
 
   return (
