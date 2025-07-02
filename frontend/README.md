@@ -1,4 +1,5 @@
 ## Problem Statement
+set NODE_OPTIONS=--openssl-legacy-provider
 
 **AI-Driven Live Call Insights:**  
 Sales and support teams struggle to provide real-time, context-aware responses during live customer calls. Manual note-taking and delayed follow-ups lead to missed opportunities and inconsistent customer experiences.

@@ -1,8 +1,9 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState } from "react";
 
 interface Transcript {
   text: string;
   isFinal: boolean;
+  speaker?: string;
 }
 
 interface Suggestion {
@@ -11,100 +12,83 @@ interface Suggestion {
 }
 
 function App() {
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string>("");
+  const [recording, setRecording] = useState(false);
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  useEffect(() => {
-    // Cleanup WebSocket on unmount or when audioFile changes
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-    };
-  }, [audioFile]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setAudioFile(file);
-    setAudioUrl(file ? URL.createObjectURL(file) : "");
+  const startRecording = async () => {
     setTranscripts([]);
     setSuggestions([]);
-    // Close previous WebSocket if any
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-  };
-
-  const handlePlay = () => {
-    if (!audioFile) return;
     wsRef.current = new WebSocket("ws://localhost:8080");
     wsRef.current.onmessage = (event: MessageEvent) => {
       const data = JSON.parse(event.data);
       if (data.type === "suggestions") {
         setSuggestions((prev) => [...prev, ...data.suggestions]);
       } else if (data.transcript !== undefined) {
-        setTranscripts((prev) => [...prev, { text: data.transcript, isFinal: data.isFinal }]);
+        setTranscripts((prev) => [
+          ...prev,
+          { text: data.transcript, isFinal: data.isFinal, speaker: data.speaker }
+        ]);
       }
     };
 
-    wsRef.current.onopen = () => {
-      // Read and send audio file in chunks as it plays
-      const chunkSize = 32000; // ~0.5s at 64kbps
-      const reader = new FileReader();
-      let offset = 0;
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    streamRef.current = stream;
+    audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 8000 });
+    const source = audioContextRef.current.createMediaStreamSource(stream);
+    const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1);
 
-      function sendChunk() {
-        if (!audioFile || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-        if (offset >= audioFile.size) return;
-        const slice = audioFile.slice(offset, offset + chunkSize);
-        reader.readAsArrayBuffer(slice);
+    processor.onaudioprocess = (e) => {
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+      const input = e.inputBuffer.getChannelData(0);
+      // Convert Float32 [-1,1] to Int16 PCM
+      const pcm = new Int16Array(input.length);
+      for (let i = 0; i < input.length; i++) {
+        let s = Math.max(-1, Math.min(1, input[i]));
+        pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
       }
-
-      reader.onload = function (e) {
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && e.target?.result) {
-          wsRef.current.send(e.target.result as ArrayBuffer);
-          offset += chunkSize;
-          setTimeout(sendChunk, 250); // send next chunk after 250ms
-        }
-      };
-
-      sendChunk();
+      wsRef.current.send(pcm.buffer);
     };
+
+    source.connect(processor);
+    processor.connect(audioContextRef.current.destination);
+    processorRef.current = processor;
+    setRecording(true);
+  };
+
+  const stopRecording = () => {
+    setRecording(false);
+    if (processorRef.current) processorRef.current.disconnect();
+    if (audioContextRef.current) audioContextRef.current.close();
+    if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+    if (wsRef.current) wsRef.current.close();
   };
 
   return (
     <div style={{ display: "flex", height: "100vh" }}>
-      {/* Left: Audio Player */}
       <div style={{ flex: 1, padding: 32 }}>
-        <h2>Select and Play Audio</h2>
-        <input type="file" accept="audio/mp3" onChange={handleFileChange} />
-        {audioUrl && (
-          <audio
-            ref={audioRef}
-            src={audioUrl}
-            controls
-            onPlay={handlePlay}
-            style={{ width: "100%", marginTop: 16 }}
-          />
+        <h2>Live Call Transcription</h2>
+        {!recording ? (
+          <button onClick={startRecording}>Start Recording</button>
+        ) : (
+          <button onClick={stopRecording}>Stop Recording</button>
         )}
         <div style={{ marginTop: 32 }}>
           <h3>Transcripts</h3>
           <ul>
             {transcripts.map((t, i) => (
               <li key={i} style={{ color: t.isFinal ? "black" : "gray" }}>
+                {t.speaker ? <b>{t.speaker}: </b> : null}
                 {t.text} {t.isFinal ? "📝" : "…"}
               </li>
             ))}
           </ul>
         </div>
       </div>
-      {/* Right: Suggestion Cards */}
       <div style={{ flex: 1, padding: 32, background: "#f7f7f7" }}>
         <h2>Suggestions</h2>
         {suggestions.map((s, i) => (
