@@ -3,10 +3,15 @@ import { WebSocketServer } from "ws";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
+import Anthropic from "@anthropic-ai/sdk";
 
 dotenv.config({ path: path.resolve("backend/.env") });
 
 const salesText = fs.readFileSync(path.resolve("../assets/salesmini.txt"), "utf-8");
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
 
 const transcribeClient = new TranscribeStreamingClient({
   region: process.env.AWS_REGION,
@@ -52,6 +57,8 @@ async function* audioStreamGenerator(audioBuffer, isClosedFn) {
   yield { AudioEvent: { AudioChunk: Buffer.alloc(0) } };
 }
 
+// ...existing code...
+
 async function streamTranscribe(ws, audioBuffer, isClosedFn) {
   const command = new StartStreamTranscriptionCommand({
     LanguageCode: "en-US",
@@ -64,6 +71,11 @@ async function streamTranscribe(ws, audioBuffer, isClosedFn) {
     MaxSpeakerLabels: 2,
   });
 
+  // Speaker mapping: spk_0/spk_1 → Speaker 1/Speaker 2
+  const speakerMap = {};
+  let speakerCount = 1;
+  let conversationHistory = [];
+
   try {
     const response = await transcribeClient.send(command);
     if (response.TranscriptResultStream) {
@@ -73,12 +85,86 @@ async function streamTranscribe(ws, audioBuffer, isClosedFn) {
           if (results && results.length > 0) {
             const result = results[0];
             const transcript = result.Alternatives?.[0]?.Transcript;
-            const speaker = result.Alternatives?.[0]?.Items?.[0]?.Speaker || result.SpeakerLabel || null;
+            const awsSpeaker = result.SpeakerLabel || null;
+
+            // Map AWS speaker label to Speaker 1/Speaker 2
+            let speakerDisplay = null;
+            if (awsSpeaker) {
+              if (!speakerMap[awsSpeaker]) {
+                speakerMap[awsSpeaker] = `Speaker ${speakerCount++}`;
+              }
+              speakerDisplay = speakerMap[awsSpeaker];
+            }
+
             if (transcript && transcript.length > 0) {
-              ws.send(JSON.stringify({ transcript, isFinal: !result.IsPartial, speaker }));
+              ws.send(JSON.stringify({ transcript, isFinal: !result.IsPartial, speaker: speakerDisplay }));
+
+              // Add to conversation history for LLM context
               if (!result.IsPartial) {
-                const suggestion = getSuggestionFromSalesText(transcript);
-                ws.send(JSON.stringify({ type: "suggestions", suggestions: [suggestion] }));
+                conversationHistory.push(`${speakerDisplay || "Speaker"}: ${transcript}`);
+
+                // === LLM EVALUATION STEP ===
+                try {
+                  // Pass the last N lines for context, or just the latest
+                  const llmInput = conversationHistory.slice(-6).join('\n');
+                  const llmResponse = await anthropic.messages.create({
+                    model: "claude-3-haiku-20240307",
+                    max_tokens: 4096,
+                    temperature: 1,
+                    system: `You are monitoring a live conversation between two people:
+- The inquirer (usually a customer or end user) is asking questions, raising objections, or sharing frustrations.
+- The responder (usually a sales or support agent) is replying or listening.
+
+The conversation is being transcribed in real-time. This means it may be mid-sentence or not yet complete. Your job is to:
+1. Carefully read the full conversation transcript provided.
+2. Check whether the inquirer has said something complete, clear, and meaningful — such as:
+   - Asking a question
+   - Raising a concern or objection
+   - Expressing confusion, frustration, or doubt
+3. If so, determine if the responder needs a Suggestion Card to help handle this moment effectively.
+4. If not (e.g. mid-sentence, nothing clear, or the responder is currently speaking), return "ready_for_suggestions": "no".
+
+When ready, return the following output in JSON format only:
+
+\`\`\`json
+{
+  "ready_for_suggestions": "yes" or "no",
+  "user_context": "[A short summary of what the inquirer is asking, complaining about, or confused by — to be used in a Suggestion Card]"
+}
+\`\`\``,
+                    messages: [
+                      {
+                        role: "user",
+                        content: [
+                          {
+                            type: "text",
+                            text: llmInput
+                          }
+                        ]
+                      }
+                    ]
+                  });
+
+                  // Extract JSON from Claude's response
+                  let llmJson = null;
+                  try {
+                    const match = llmResponse.content[0].text.match(/\{[\s\S]*\}/);
+                    llmJson = match ? JSON.parse(match[0]) : null;
+                  } catch (e) {
+                    llmJson = { ready_for_suggestions: "no", user_context: "Could not parse LLM response." };
+                  }
+
+                  // Send LLM JSON to frontend for display (include which speaker)
+                  ws.send(JSON.stringify({ type: "llm_eval", llm: { ...llmJson, speaker: speakerDisplay, transcript } }));
+
+                  // Only show suggestions if ready
+                  if (llmJson && llmJson.ready_for_suggestions === "yes") {
+                    const suggestion = getSuggestionFromSalesText(transcript);
+                    ws.send(JSON.stringify({ type: "suggestions", suggestions: [suggestion] }));
+                  }
+                } catch (e) {
+                  ws.send(JSON.stringify({ type: "llm_eval", llm: { ready_for_suggestions: "no", user_context: "LLM error: " + e.message, speaker: speakerDisplay, transcript } }));
+                }
               }
             }
           }

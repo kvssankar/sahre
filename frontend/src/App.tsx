@@ -12,6 +12,8 @@ interface Suggestion {
 }
 
 function App() {
+  const [llmEval, setLlmEval] = useState<any>(null);
+  const [llmEvals, setLlmEvals] = useState<any[]>([]);
   const [recording, setRecording] = useState(false);
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -23,11 +25,14 @@ function App() {
   const startRecording = async () => {
     setTranscripts([]);
     setSuggestions([]);
+    setLlmEval(null);
     wsRef.current = new WebSocket("ws://localhost:8080");
     wsRef.current.onmessage = (event: MessageEvent) => {
       const data = JSON.parse(event.data);
       if (data.type === "suggestions") {
         setSuggestions((prev) => [...prev, ...data.suggestions]);
+      } else if (data.type === "llm_eval") {
+        setLlmEvals((prev) => [...prev, data.llm]); // <-- append to array!
       } else if (data.transcript !== undefined) {
         setTranscripts((prev) => [
           ...prev,
@@ -79,14 +84,45 @@ function App() {
         )}
         <div style={{ marginTop: 32 }}>
           <h3>Transcripts</h3>
-          <ul>
-            {transcripts.map((t, i) => (
-              <li key={i} style={{ color: t.isFinal ? "black" : "gray" }}>
-                {t.speaker ? <b>{t.speaker}: </b> : null}
-                {t.text} {t.isFinal ? "📝" : "…"}
-              </li>
-            ))}
-          </ul>
+          <div style={{
+            height: "40vh",
+            overflowY: "auto",
+            border: "1px solid #eee",
+            borderRadius: 6,
+            background: "#fafafa",
+            padding: 8,
+            marginBottom: 16
+          }}>
+            <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+              {transcripts.map((t, i) => (
+                <li key={i} style={{ color: t.isFinal ? "black" : "gray", marginBottom: 4 }}>
+                  {t.speaker ? <b>{t.speaker}: </b> : null}
+                  {t.text} {t.isFinal ? "📝" : "…"}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <div style={{ height: "40vh", marginTop: 0 }}>
+          <h3>LLM Evaluation (after each final)</h3>
+          <div style={{
+            background: "#f0f0f0",
+            padding: 12,
+            borderRadius: 6,
+            height: "calc(40vh - 48px)",
+            width: 480,
+            overflowY: "auto",
+            overflowX: "auto"
+          }}>
+            {llmEvals.length === 0
+              ? "LLM not called yet."
+              : llmEvals.map((evalObj, idx) => (
+                <pre key={idx} style={{ marginBottom: 12, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                  {evalObj.speaker ? <b>{evalObj.speaker}: </b> : null}
+                  {JSON.stringify(evalObj, null, 2)}
+                </pre>
+              ))}
+          </div>
         </div>
       </div>
       <div style={{ flex: 1, padding: 32, background: "#f7f7f7" }}>
