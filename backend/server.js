@@ -75,6 +75,10 @@ async function streamTranscribe(ws, audioBuffer, isClosedFn) {
   const speakerMap = {};
   let speakerCount = 1;
   let conversationHistory = [];
+  let lastFinalSpeaker = null;
+  let lastFinalTranscript = null;
+  let inquirerSpeaker = null;
+  let responderSpeaker = null;
 
   try {
     const response = await transcribeClient.send(command);
@@ -86,8 +90,6 @@ async function streamTranscribe(ws, audioBuffer, isClosedFn) {
             const result = results[0];
             const transcript = result.Alternatives?.[0]?.Transcript;
             const awsSpeaker = result.SpeakerLabel || null;
-
-            // Map AWS speaker label to Speaker 1/Speaker 2
             let speakerDisplay = null;
             if (awsSpeaker) {
               if (!speakerMap[awsSpeaker]) {
@@ -99,19 +101,29 @@ async function streamTranscribe(ws, audioBuffer, isClosedFn) {
             if (transcript && transcript.length > 0) {
               ws.send(JSON.stringify({ transcript, isFinal: !result.IsPartial, speaker: speakerDisplay }));
 
-              // Add to conversation history for LLM context
               if (!result.IsPartial) {
-                conversationHistory.push(`${speakerDisplay || "Speaker"}: ${transcript}`);
+                conversationHistory.push(`${speakerDisplay}: ${transcript}`);
 
-                // === LLM EVALUATION STEP ===
-                try {
-                  // Pass the last N lines for context, or just the latest
-                  const llmInput = conversationHistory.slice(-6).join('\n');
-                  const llmResponse = await anthropic.messages.create({
-                    model: "claude-3-haiku-20240307",
-                    max_tokens: 4096,
-                    temperature: 1,
-                    system: `You are monitoring a live conversation between two people:
+                // Identify inquirer and responder on first two speakers
+                if (!inquirerSpeaker) {
+                  inquirerSpeaker = speakerDisplay;
+                } else if (!responderSpeaker && speakerDisplay !== inquirerSpeaker) {
+                  responderSpeaker = speakerDisplay;
+                }
+
+                // If the last final was from the inquirer and this one is from the responder, trigger LLM
+                if (
+                  lastFinalSpeaker === inquirerSpeaker &&
+                  speakerDisplay === responderSpeaker &&
+                  lastFinalTranscript
+                ) {
+                  try {
+                    const llmInput = conversationHistory.slice(-6).join('\n');
+                    const llmResponse = await anthropic.messages.create({
+                      model: "claude-3-haiku-20240307", // <-- REQUIRED!
+                      max_tokens: 4096,
+                      temperature: 1,
+                      system: `You are monitoring a live conversation between two people:
 - The inquirer (usually a customer or end user) is asking questions, raising objections, or sharing frustrations.
 - The responder (usually a sales or support agent) is replying or listening.
 
@@ -132,39 +144,41 @@ When ready, return the following output in JSON format only:
   "user_context": "[A short summary of what the inquirer is asking, complaining about, or confused by — to be used in a Suggestion Card]"
 }
 \`\`\``,
-                    messages: [
-                      {
-                        role: "user",
-                        content: [
-                          {
-                            type: "text",
-                            text: llmInput
-                          }
-                        ]
-                      }
-                    ]
-                  });
+                      messages: [
+                        {
+                          role: "user",
+                          content: [
+                            {
+                              type: "text",
+                              text: llmInput
+                            }
+                          ]
+                        }
+                      ]
+                    });
 
-                  // Extract JSON from Claude's response
-                  let llmJson = null;
-                  try {
-                    const match = llmResponse.content[0].text.match(/\{[\s\S]*\}/);
-                    llmJson = match ? JSON.parse(match[0]) : null;
+                    let llmJson = null;
+                    try {
+                      const match = llmResponse.content[0].text.match(/\{[\s\S]*\}/);
+                      llmJson = match ? JSON.parse(match[0]) : null;
+                    } catch (e) {
+                      llmJson = { ready_for_suggestions: "no", user_context: "Could not parse LLM response." };
+                    }
+
+                    ws.send(JSON.stringify({ type: "llm_eval", llm: { ...llmJson, speaker: inquirerSpeaker, transcript: lastFinalTranscript } }));
+
+                    if (llmJson && llmJson.ready_for_suggestions === "yes") {
+                      const suggestion = getSuggestionFromSalesText(lastFinalTranscript);
+                      ws.send(JSON.stringify({ type: "suggestions", suggestions: [suggestion] }));
+                    }
                   } catch (e) {
-                    llmJson = { ready_for_suggestions: "no", user_context: "Could not parse LLM response." };
+                    ws.send(JSON.stringify({ type: "llm_eval", llm: { ready_for_suggestions: "no", user_context: "LLM error: " + e.message, speaker: inquirerSpeaker, transcript: lastFinalTranscript } }));
                   }
-
-                  // Send LLM JSON to frontend for display (include which speaker)
-                  ws.send(JSON.stringify({ type: "llm_eval", llm: { ...llmJson, speaker: speakerDisplay, transcript } }));
-
-                  // Only show suggestions if ready
-                  if (llmJson && llmJson.ready_for_suggestions === "yes") {
-                    const suggestion = getSuggestionFromSalesText(transcript);
-                    ws.send(JSON.stringify({ type: "suggestions", suggestions: [suggestion] }));
-                  }
-                } catch (e) {
-                  ws.send(JSON.stringify({ type: "llm_eval", llm: { ready_for_suggestions: "no", user_context: "LLM error: " + e.message, speaker: speakerDisplay, transcript } }));
                 }
+
+                // Update last speaker and transcript
+                lastFinalSpeaker = speakerDisplay;
+                lastFinalTranscript = transcript;
               }
             }
           }
