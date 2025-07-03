@@ -9,6 +9,7 @@ interface Transcript {
 interface Suggestion {
   title: string;
   content: string;
+  trigger?: string;
 }
 
 function App() {
@@ -146,8 +147,12 @@ function App() {
         <h2>Suggestions</h2>
         {suggestions.map((s, i) => (
           <div key={i} style={{ background: "#fff", margin: 8, padding: 16, borderRadius: 8, boxShadow: "0 2px 8px #ddd" }}>
-            <strong>{s.title}</strong>
-            <div>{s.content}</div>
+            {s.trigger && (
+              <div style={{ fontWeight: "bold", color: "#555", marginBottom: 8 }}>
+                Suggestion for: <span style={{ fontStyle: "italic" }}>{s.trigger}</span>
+              </div>
+            )}
+            <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit" }}>{s.content}</pre>
           </div>
         ))}
       </div>
