@@ -39,7 +39,6 @@ wss.on("connection", (ws) => {
     console.log("Client disconnected");
   });
 
-  // Start streaming to AWS Transcribe as soon as connection is established
   streamTranscribe(ws, audioBuffer, () => isClosed);
 });
 
@@ -53,11 +52,8 @@ async function* audioStreamGenerator(audioBuffer, isClosedFn) {
       await new Promise((r) => setTimeout(r, 10));
     }
   }
-  // Graceful end
   yield { AudioEvent: { AudioChunk: Buffer.alloc(0) } };
 }
-
-// ...existing code...
 
 async function streamTranscribe(ws, audioBuffer, isClosedFn) {
   const command = new StartStreamTranscriptionCommand({
@@ -71,10 +67,10 @@ async function streamTranscribe(ws, audioBuffer, isClosedFn) {
     MaxSpeakerLabels: 2,
   });
 
-  // Speaker mapping: spk_0/spk_1 → Speaker 1/Speaker 2
   const speakerMap = {};
   let speakerCount = 1;
   let conversationHistory = [];
+  let conversationSummary = "The conversation has just started.";
   let lastFinalSpeaker = null;
   let lastFinalTranscript = null;
   let inquirerSpeaker = null;
@@ -104,6 +100,40 @@ async function streamTranscribe(ws, audioBuffer, isClosedFn) {
               if (!result.IsPartial) {
                 conversationHistory.push(`${speakerDisplay}: ${transcript}`);
 
+                // --- Update conversation summary using LLM ---
+                try {
+                  const summaryPrompt = `
+Conversation summary so far:
+${conversationSummary}
+
+New utterance:
+${speakerDisplay}: ${transcript}
+
+Update the summary to include the new information. Return only the updated summary.
+                  `;
+                  const summaryResponse = await anthropic.messages.create({
+                    model: "claude-3-haiku-20240307",
+                    max_tokens: 1024,
+                    temperature: 0.5,
+                    system: "You are a helpful assistant that summarizes conversations between two people. Always return only the updated summary.",
+                    messages: [
+                      {
+                        role: "user",
+                        content: [
+                          {
+                            type: "text",
+                            text: summaryPrompt
+                          }
+                        ]
+                      }
+                    ]
+                  });
+                  conversationSummary = summaryResponse.content[0].text.trim();
+                  ws.send(JSON.stringify({ type: "summary", summary: conversationSummary }));
+                } catch (e) {
+                  console.warn("Failed to update summary:", e.message);
+                }
+
                 // Identify inquirer and responder on first two speakers
                 if (!inquirerSpeaker) {
                   inquirerSpeaker = speakerDisplay;
@@ -118,9 +148,15 @@ async function streamTranscribe(ws, audioBuffer, isClosedFn) {
                   lastFinalTranscript
                 ) {
                   try {
-                    const llmInput = conversationHistory.slice(-6).join('\n');
+                    const llmInput = `
+Conversation summary so far:
+${conversationSummary}
+
+Recent utterances:
+${conversationHistory.slice(-6).join('\n')}
+                    `;
                     const llmResponse = await anthropic.messages.create({
-                      model: "claude-3-haiku-20240307", // <-- REQUIRED!
+                      model: "claude-3-haiku-20240307",
                       max_tokens: 4096,
                       temperature: 1,
                       system: `You are monitoring a live conversation between two people:
@@ -165,18 +201,17 @@ When ready, return the following output in JSON format only:
                       llmJson = { ready_for_suggestions: "no", user_context: "Could not parse LLM response." };
                     }
 
-                    ws.send(JSON.stringify({ type: "llm_eval", llm: { ...llmJson, speaker: inquirerSpeaker, transcript: lastFinalTranscript } }));
+                    ws.send(JSON.stringify({ type: "llm_eval", llm: { ...llmJson, speaker: inquirerSpeaker, transcript: lastFinalTranscript, summary: conversationSummary } }));
 
                     if (llmJson && llmJson.ready_for_suggestions === "yes") {
                       const suggestion = getSuggestionFromSalesText(lastFinalTranscript);
                       ws.send(JSON.stringify({ type: "suggestions", suggestions: [suggestion] }));
                     }
                   } catch (e) {
-                    ws.send(JSON.stringify({ type: "llm_eval", llm: { ready_for_suggestions: "no", user_context: "LLM error: " + e.message, speaker: inquirerSpeaker, transcript: lastFinalTranscript } }));
+                    ws.send(JSON.stringify({ type: "llm_eval", llm: { ready_for_suggestions: "no", user_context: "LLM error: " + e.message, speaker: inquirerSpeaker, transcript: lastFinalTranscript, summary: conversationSummary } }));
                   }
                 }
 
-                // Update last speaker and transcript
                 lastFinalSpeaker = speakerDisplay;
                 lastFinalTranscript = transcript;
               }

@@ -12,11 +12,11 @@ interface Suggestion {
 }
 
 function App() {
-  const [llmEval, setLlmEval] = useState<any>(null);
-  const [llmEvals, setLlmEvals] = useState<any[]>([]);
   const [recording, setRecording] = useState(false);
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [llmEvals, setLlmEvals] = useState<any[]>([]);
+  const [summary, setSummary] = useState<string>("The conversation has just started.");
   const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
@@ -25,14 +25,17 @@ function App() {
   const startRecording = async () => {
     setTranscripts([]);
     setSuggestions([]);
-    setLlmEval(null);
+    setLlmEvals([]);
+    setSummary("The conversation has just started.");
     wsRef.current = new WebSocket("ws://localhost:8080");
     wsRef.current.onmessage = (event: MessageEvent) => {
       const data = JSON.parse(event.data);
       if (data.type === "suggestions") {
         setSuggestions((prev) => [...prev, ...data.suggestions]);
       } else if (data.type === "llm_eval") {
-        setLlmEvals((prev) => [...prev, data.llm]); // <-- append to array!
+        setLlmEvals((prev) => [...prev, data.llm]);
+      } else if (data.type === "summary") {
+        setSummary(data.summary);
       } else if (data.transcript !== undefined) {
         setTranscripts((prev) => [
           ...prev,
@@ -50,7 +53,6 @@ function App() {
     processor.onaudioprocess = (e) => {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
       const input = e.inputBuffer.getChannelData(0);
-      // Convert Float32 [-1,1] to Int16 PCM
       const pcm = new Int16Array(input.length);
       for (let i = 0; i < input.length; i++) {
         let s = Math.max(-1, Math.min(1, input[i]));
@@ -83,9 +85,24 @@ function App() {
           <button onClick={stopRecording}>Stop Recording</button>
         )}
         <div style={{ marginTop: 32 }}>
+          <h3>Conversation Summary</h3>
+          <div style={{
+            background: "#f0f0f0",
+            padding: 12,
+            borderRadius: 6,
+            minHeight: 60,
+            marginBottom: 16,
+            width: 480,
+            maxWidth: "100%",
+            fontSize: 16
+          }}>
+            {summary}
+          </div>
+        </div>
+        <div style={{ marginTop: 16 }}>
           <h3>Transcripts</h3>
           <div style={{
-            height: "40vh",
+            height: "30vh",
             overflowY: "auto",
             border: "1px solid #eee",
             borderRadius: 6,
@@ -103,13 +120,13 @@ function App() {
             </ul>
           </div>
         </div>
-        <div style={{ height: "40vh", marginTop: 0 }}>
+        <div style={{ height: "30vh", marginTop: 0 }}>
           <h3>LLM Evaluation (after each final)</h3>
           <div style={{
             background: "#f0f0f0",
             padding: 12,
             borderRadius: 6,
-            height: "calc(40vh - 48px)",
+            height: "calc(30vh - 48px)",
             width: 480,
             overflowY: "auto",
             overflowX: "auto"
