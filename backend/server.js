@@ -1,7 +1,6 @@
 import { TranscribeStreamingClient, StartStreamTranscriptionCommand, PartialResultsStability } from "@aws-sdk/client-transcribe-streaming";
 import { WebSocketServer } from "ws";
 import dotenv from "dotenv";
-import fs from "fs";
 import path from "path";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -204,15 +203,80 @@ Instructions:
                   responderSpeaker = speakerDisplay;
                 }
 
-                // If the last final was from the inquirer and this one is from the responder, trigger LLM for suggestion card
+                // If the last final was from the inquirer and this one is from the responder, trigger LLM evaluation (Prompt 1)
                 if (
                   lastFinalSpeaker === inquirerSpeaker &&
                   speakerDisplay === responderSpeaker &&
                   lastFinalTranscript
                 ) {
                   try {
-                    // Build the suggestion prompt
-                    const suggestionPrompt = `
+                    // Prompt 1: LLM evaluation for suggestion card trigger
+                    const evalPrompt = `
+You are an AI assistant monitoring a live conversation between a customer and an agent.
+
+Product and Sales Context:
+${PRODUCT_CONTEXT}
+
+Conversation Summary:
+${conversationSummary}
+
+Recent Conversation History:
+${conversationHistory.slice(-6).join('\n')}
+
+Customer's Latest Message:
+${lastFinalTranscript}
+
+Instructions:
+- Decide if the customer's latest message is a clear, relevant question, objection, or concern about the product, sales process, or support, and is related to the product context above.
+- If it is relevant and actionable, return "ready_for_suggestions": "yes".
+- If it is not relevant to the product context, or is off-topic, return "ready_for_suggestions": "no".
+- Also return a short summary of the customer's intent as "user_context".
+
+Respond ONLY in this JSON format:
+{
+  "ready_for_suggestions": "yes" or "no",
+  "user_context": "[short summary of the customer's question or concern]"
+}
+                    `;
+                    const evalResponse = await anthropic.messages.create({
+                      model: "claude-3-haiku-20240307",
+                      max_tokens: 512,
+                      temperature: 0.2,
+                      system: "",
+                      messages: [
+                        {
+                          role: "user",
+                          content: [
+                            {
+                              type: "text",
+                              text: evalPrompt
+                            }
+                          ]
+                        }
+                      ]
+                    });
+
+                    let evalJson = null;
+                    try {
+                      const match = evalResponse.content[0].text.match(/\{[\s\S]*\}/);
+                      evalJson = match ? JSON.parse(match[0]) : null;
+                    } catch (e) {
+                      evalJson = { ready_for_suggestions: "no", user_context: "Could not parse LLM response." };
+                    }
+
+                    ws.send(JSON.stringify({
+                      type: "llm_eval",
+                      llm: {
+                        ...evalJson,
+                        trigger: lastFinalTranscript,
+                        summary: conversationSummary,
+                        history: conversationHistory.slice(-6).join('\n')
+                      }
+                    }));
+
+                    // Only call Prompt 2 if ready_for_suggestions is "yes"
+                    if (evalJson && evalJson.ready_for_suggestions === "yes") {
+                      const suggestionPrompt = `
 ${SUGGESTION_SYSTEM_PROMPT}
 
 Product and Sales Context:
@@ -226,52 +290,45 @@ ${conversationHistory.slice(-6).join('\n')}
 
 User Question (Trigger Phrase):
 ${lastFinalTranscript}
-                    `;
-                    const suggestionResponse = await anthropic.messages.create({
-                      model: "claude-sonnet-4-20250514",
-                      max_tokens: 2000,
-                      temperature: 1,
-                      system: "",
-                      messages: [
-                        {
-                          role: "user",
-                          content: [
-                            {
-                              type: "text",
-                              text: suggestionPrompt
-                            }
-                          ]
-                        }
-                      ]
-                    });
+                      `;
+                      const suggestionResponse = await anthropic.messages.create({
+                        model: "claude-sonnet-4-20250514",
+                        max_tokens: 2000,
+                        temperature: 1,
+                        system: "",
+                        messages: [
+                          {
+                            role: "user",
+                            content: [
+                              {
+                                type: "text",
+                                text: suggestionPrompt
+                              }
+                            ]
+                          }
+                        ]
+                      });
 
-                    // Parse the suggestion card from the LLM response
-                    let suggestionText = suggestionResponse.content[0].text.trim();
-                    ws.send(JSON.stringify({
-                      type: "suggestions",
-                      suggestions: [{
-                        title: "Suggestion Card",
-                        content: suggestionText,
-                        trigger: lastFinalTranscript
-                      }]
-                    }));
+                      let suggestionText = suggestionResponse.content[0].text.trim();
+                      ws.send(JSON.stringify({
+                        type: "suggestions",
+                        suggestions: [{
+                          title: "Suggestion Card",
+                          content: suggestionText,
+                          trigger: lastFinalTranscript
+                        }]
+                      }));
+                    }
+                  } catch (e) {
                     ws.send(JSON.stringify({
                       type: "llm_eval",
                       llm: {
-                        suggestion_raw: suggestionText,
+                        ready_for_suggestions: "no",
+                        user_context: "LLM error: " + e.message,
                         trigger: lastFinalTranscript,
                         summary: conversationSummary,
                         history: conversationHistory.slice(-6).join('\n')
                       }
-                    }));
-                  } catch (e) {
-                    ws.send(JSON.stringify({
-                      type: "suggestions",
-                      suggestions: [{
-                        title: "Suggestion Card",
-                        content: "LLM error: " + e.message,
-                        trigger: lastFinalTranscript
-                      }]
                     }));
                   }
                 }
