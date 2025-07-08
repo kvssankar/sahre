@@ -256,7 +256,7 @@ Instructions:
 
                     // Use precomputed RAG summary for this connection
 
-                    // Prompt 1: LLM evaluation for suggestion card trigger, using RAG summary as product context
+                    // Prompt 1: LLM evaluation for suggestion card trigger, and if RAG is required
                     const evalPrompt = `
 You are an AI assistant monitoring a live conversation between a customer and an agent.
 
@@ -273,14 +273,17 @@ Customer's Latest Message:
 ${lastFinalTranscript}
 
 Instructions:
-- Decide if the customer's latest message is a clear, relevant question, objection, or concern about the product, sales process, or support, and is related to the product context above.
-- If it is relevant and actionable, return "ready_for_suggestions": "yes".
-- If it is not relevant to the product context, or is off-topic, return "ready_for_suggestions": "no".
-- Also return a short summary of the customer's intent as "user_context".
+- Evaluate the customer's latest message and decide:
+  1. Is a suggestion card needed? (yes/no)
+  2. Is RAG (knowledge base context) required to answer/help? (yes/no)
+  3. If suggestion card is needed, provide a short summary of the user's intent as "user_context".
+- Suggestion cards can be needed for both RAG and non-RAG (generic sales/help/tone) cases.
+- If the message is off-topic or not actionable, set both to "no".
 
 Respond ONLY in this JSON format:
 {
   "ready_for_suggestions": "yes" or "no",
+  "is_rag_required": "yes" or "no",
   "user_context": "[short summary of the customer's question or concern]"
 }
                     `;
@@ -322,14 +325,16 @@ Respond ONLY in this JSON format:
 
                     // Only call Prompt 2 if ready_for_suggestions is "yes"
                     if (evalJson && evalJson.ready_for_suggestions === "yes") {
-                      // Local RAG: Find relevant context from local vectors
                       let ragContext = "";
-                      try {
-                        const topChunks = await getTopKRelevantChunks(lastFinalTranscript, 3);
-                        ragContext = topChunks.join("\n---\n");
-                      } catch (e) {
-                        ragContext = "";
-                        console.warn("Local RAG error:", e.message);
+                      if (evalJson.is_rag_required === "yes") {
+                        // RAG required: Find relevant context from local vectors
+                        try {
+                          const topChunks = await getTopKRelevantChunks(lastFinalTranscript, 3);
+                          ragContext = topChunks.join("\n---\n");
+                        } catch (e) {
+                          ragContext = "";
+                          console.warn("Local RAG error:", e.message);
+                        }
                       }
 
                       const suggestionPrompt = `
@@ -338,9 +343,7 @@ ${SUGGESTION_SYSTEM_PROMPT}
 Product and Sales Context (from knowledge base):
 ${ragSummary}
 
-Relevant Knowledge Base (RAG):
-${ragContext}
-
+${evalJson.is_rag_required === "yes" ? `Relevant Knowledge Base (RAG):\n${ragContext}\n` : ""}
 Conversation Summary:
 ${conversationSummary}
 
