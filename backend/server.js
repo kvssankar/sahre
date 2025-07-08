@@ -3,32 +3,14 @@ import { WebSocketServer } from "ws";
 import dotenv from "dotenv";
 import path from "path";
 import Anthropic from "@anthropic-ai/sdk";
+import fs from "fs";
+import { BedrockEmbeddings } from "@langchain/aws";
 
 dotenv.config({ path: path.resolve("backend/.env") });
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-const PRODUCT_CONTEXT = `
-Product Overview:
-Our CRM platform helps businesses streamline their sales process, manage leads efficiently, and automate follow-ups. It integrates seamlessly with popular tools like Salesforce, HubSpot, Slack, Gmail, and more. With features like real-time analytics, intelligent lead scoring, and customizable workflows, our product supports both small teams and large enterprises. Pricing starts at $49 per user per month, with tiered plans for larger teams.
-
-Typical Customer Challenges:
-Many of our users switch to us because they’re struggling with leads slipping through the cracks due to scattered tools and manual processes. Some find it hard to customize workflows without developer support. Others are frustrated with outdated reports or time-consuming integrations. Our CRM solves these issues with end-to-end visibility, easy automation, and live dashboards that update in real time.
-
-Objection Handling:
-When prospects say we’re too expensive, we explain how our customers typically see 3–5x ROI in just a few months by recovering lost leads and saving time. If someone mentions they already use Salesforce, we highlight that we enhance Salesforce’s capabilities by eliminating tedious admin work. For those worried about setup time, we share that most customers are onboarded within a week, and we offer white-glove onboarding support to make it seamless.
-
-Industry Templates:
-We offer ready-made templates based on industry. For example, in real estate, we support workflows from lead capture through to document collection and deal closure. In healthcare, we support appointment scheduling, reminders, and patient feedback. EdTech clients use us to manage demo bookings, free trial activations, and student follow-ups with automated messaging.
-
-Success Stories:
-ABC Corp improved their lead conversion rate by 37% in just two months using our automated follow-ups. A financial services client reduced manual CRM tasks by 40% by integrating our platform with their internal tools. These success stories help reinforce trust and demonstrate real-world impact.
-
-Trigger-Based Guidance:
-During calls, if a prospect mentions they currently manage sales in Excel, the assistant should surface a prompt explaining the benefits of switching to a dedicated CRM—like fewer errors, better tracking, and time saved. If they ask about setup time, a quick success story and average onboarding timeline should be shown. If the user talks about managing a large team, the assistant can highlight our features for collaboration, permissions, and team performance tracking. If data privacy comes up, cards about SOC 2 compliance and role-based access should appear instantly.
-`;
 
 const SUGGESTION_SYSTEM_PROMPT = `You are an AI assistant embedded in a live conversation between two people:
 
@@ -71,6 +53,37 @@ Content:
 Now begin.
 `;
 
+const vectorsPath = path.resolve("heythere_vectors.json");
+let salesVectors = [];
+if (fs.existsSync(vectorsPath)) {
+  salesVectors = JSON.parse(fs.readFileSync(vectorsPath, "utf-8"));
+} else {
+  console.warn("sales_txt_vectors.json not found. Please run the ingestion script first.");
+}
+
+function cosineSimilarity(a, b) {
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+async function getTopKRelevantChunks(query, k = 3) {
+  const embedder = new BedrockEmbeddings({
+    region: process.env.AWS_REGION || "us-east-1",
+    model: "amazon.titan-embed-text-v1",
+  });
+  const [queryVec] = await embedder.embedDocuments([query]);
+  const scored = salesVectors.map(obj => ({
+    chunk: obj.chunk,
+    score: cosineSimilarity(queryVec, obj.vector)
+  }));
+  return scored.sort((a, b) => b.score - a.score).slice(0, k).map(s => s.chunk);
+}
+
 const transcribeClient = new TranscribeStreamingClient({
   region: process.env.AWS_REGION,
   credentials: {
@@ -82,11 +95,41 @@ const transcribeClient = new TranscribeStreamingClient({
 const wss = new WebSocketServer({ port: 8080 });
 console.log("WebSocket server started on ws://localhost:8080");
 
-wss.on("connection", (ws) => {
+wss.on("connection", async (ws) => {
   console.log("Client connected");
 
   let audioBuffer = [];
   let isClosed = false;
+
+  // Precompute RAG summary ONCE per connection
+  let ragSummary = "";
+  try {
+    // Use a generic query to get the most representative context (e.g., first chunk or a default question)
+    const topChunks = await getTopKRelevantChunks("overview", 3);
+    const summaryPrompt = `Summarize the following knowledge base context in 2-3 sentences for a sales/support agent:\n\n${topChunks.join("\n---\n")}`;
+    const ragSummaryResponse = await anthropic.messages.create({
+      model: "claude-3-haiku-20240307",
+      max_tokens: 256,
+      temperature: 0.2,
+      system: "You are a helpful assistant that summarizes knowledge base context for sales/support agents.",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: summaryPrompt
+            }
+          ]
+        }
+      ]
+    });
+    ragSummary = ragSummaryResponse.content[0].text.trim();
+    console.log("Precomputed RAG summary:", ragSummary);
+  } catch (e) {
+    ragSummary = "";
+    console.warn("RAG summary error (on connect):", e.message);
+  }
 
   ws.on("message", (data) => {
     audioBuffer.push(Buffer.from(data));
@@ -97,7 +140,7 @@ wss.on("connection", (ws) => {
     console.log("Client disconnected");
   });
 
-  streamTranscribe(ws, audioBuffer, () => isClosed);
+  streamTranscribe(ws, audioBuffer, () => isClosed, ragSummary);
 });
 
 async function* audioStreamGenerator(audioBuffer, isClosedFn) {
@@ -113,7 +156,7 @@ async function* audioStreamGenerator(audioBuffer, isClosedFn) {
   yield { AudioEvent: { AudioChunk: Buffer.alloc(0) } };
 }
 
-async function streamTranscribe(ws, audioBuffer, isClosedFn) {
+async function streamTranscribe(ws, audioBuffer, isClosedFn, ragSummary) {
   const command = new StartStreamTranscriptionCommand({
     LanguageCode: "en-IN",
     MediaEncoding: "pcm",
@@ -210,12 +253,15 @@ Instructions:
                   lastFinalTranscript
                 ) {
                   try {
-                    // Prompt 1: LLM evaluation for suggestion card trigger
+
+                    // Use precomputed RAG summary for this connection
+
+                    // Prompt 1: LLM evaluation for suggestion card trigger, using RAG summary as product context
                     const evalPrompt = `
 You are an AI assistant monitoring a live conversation between a customer and an agent.
 
-Product and Sales Context:
-${PRODUCT_CONTEXT}
+Product and Sales Context (from knowledge base):
+${ragSummary}
 
 Conversation Summary:
 ${conversationSummary}
@@ -276,11 +322,24 @@ Respond ONLY in this JSON format:
 
                     // Only call Prompt 2 if ready_for_suggestions is "yes"
                     if (evalJson && evalJson.ready_for_suggestions === "yes") {
+                      // Local RAG: Find relevant context from local vectors
+                      let ragContext = "";
+                      try {
+                        const topChunks = await getTopKRelevantChunks(lastFinalTranscript, 3);
+                        ragContext = topChunks.join("\n---\n");
+                      } catch (e) {
+                        ragContext = "";
+                        console.warn("Local RAG error:", e.message);
+                      }
+
                       const suggestionPrompt = `
 ${SUGGESTION_SYSTEM_PROMPT}
 
-Product and Sales Context:
-${PRODUCT_CONTEXT}
+Product and Sales Context (from knowledge base):
+${ragSummary}
+
+Relevant Knowledge Base (RAG):
+${ragContext}
 
 Conversation Summary:
 ${conversationSummary}

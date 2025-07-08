@@ -1,0 +1,49 @@
+1. Company/Product Overview
+Product: CRM Platform (e.g., "AcmeCRM")
+USP:
+Integrates with existing tools like Salesforce, HubSpot, Gmail
+Real-time analytics and lead scoring
+Automated follow-ups
+Pricing: Starts at $49/user/month
+2. Common Customer Pain Points
+Pain Point Suggested Response Card
+Leads are slipping through
+cracks
+“Most customers face this with disconnected systems. Our CRM ensures every lead
+is tracked end-to-end.”
+Integration with existing
+tools
+“We offer seamless plug-and-play integrations with 50+ tools including Slack,
+Gmail, HubSpot.”
+Difficult to customize
+workflows
+“Our drag-and-drop builder allows non-tech teams to set up automation in
+minutes.”
+Reporting is manual or
+outdated
+“We provide live dashboards for pipeline health, conversion rates, and rep
+performance.”
+3. Objection Handling Playbook
+Objection AI Card Prompt
+“Too expensive” “Compared to churned leads, our ROI is typically 3–5x in 3 months.”
+“We’re using Salesforce
+already”
+“Many of our clients use Salesforce. We actually enhance its capabilities and reduce
+admin overhead.”
+“Setup takes time” “We onboard most customers in < 1 week. We also offer white-glove onboarding.”
+4. Industry-Specific Templates
+Printed using ChatGPT to PDF, powered by PDFCrowd HTML to PDF API. 2/7
+Industry Ready-Made Workflows
+Real Estate Lead capture → Site visit → Doc collection → Close
+Healthcare Patient intake → Appointment booking → Reminder → Feedback
+EdTech Inquiry → Demo scheduling → Trial activation → Follow-up
+5. Case Studies & Success Stories
+Company Result Achieved
+ABC Corp “Increased lead conversion by 37% in 2 months using our workflows.”
+FinBank “Reduced manual CRM tasks by 40% with our integrations.”
+6. Trigger Phrases → Card Suggestions
+Keyword/Phrase from User Suggest This Card
+“We currently use Excel/Sheets” Card on benefits of switching from Excel to CRM
+“How fast is setup?” Onboarding time and case study of fast deployment
+“We have a sales team of 10+ people” Show multi-user collaboration features
+“Security is a concern” Show SOC 2 / GDPR compliance & role-based access card
