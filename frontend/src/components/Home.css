@@ -88,10 +88,15 @@
   max-width: 600px;
 }
 
+.textarea-wrapper {
+  position: relative;
+  width: 100%;
+}
+
 .main-textarea {
   width: 100%;
   min-height: 120px;
-  padding: 20px;
+  padding: 20px 60px 20px 20px;
   border: 1px solid #404040;
   border-radius: 12px;
   background-color: #2a2a2a;
@@ -102,6 +107,33 @@
   outline: none;
   transition: all 0.3s ease;
   box-sizing: border-box;
+}
+
+.arrow-button {
+  position: absolute;
+  right: 15px;
+  bottom: 15px;
+  width: 40px;
+  height: 40px;
+  background-color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  color: #333333;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.arrow-button:hover {
+  background-color: #f0f0f0;
+  transform: translateX(2px);
+}
+
+.arrow-button svg {
+  width: 20px;
+  height: 20px;
 }
 
 .main-textarea:focus {

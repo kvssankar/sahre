@@ -1,8 +1,14 @@
-import React, { useState } from 'react';
-import './Home.css';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import "./Home.css";
 
 const Home = () => {
-  const [meetingTopic, setMeetingTopic] = useState('');
+  const [meetingTopic, setMeetingTopic] = useState("");
+  const navigate = useNavigate();
+
+  const handleArrowClick = () => {
+    navigate("/dashboard");
+  };
 
   return (
     <div className="home-container">
@@ -19,13 +25,36 @@ const Home = () => {
 
         {/* Main Input Area */}
         <div className="input-container">
-          <textarea 
-            className="main-textarea"
-            placeholder="Enter meeting topic..."
-            value={meetingTopic}
-            onChange={(e) => setMeetingTopic(e.target.value)}
-            rows={4}
-          />
+          <div className="textarea-wrapper">
+            <textarea
+              className="main-textarea"
+              placeholder="Enter meeting topic..."
+              value={meetingTopic}
+              onChange={(e) => setMeetingTopic(e.target.value)}
+              rows={4}
+            />
+            <button
+              className="arrow-button"
+              onClick={handleArrowClick}
+              type="button"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M5 12H19M19 12L12 5M19 12L12 19"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Tags Section */}
