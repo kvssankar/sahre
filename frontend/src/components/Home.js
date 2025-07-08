@@ -9,7 +9,12 @@ const Home = () => {
       <div className="content-center">
         {/* Logo/Title */}
         <div className="logo-container">
-          <h1 className="logo-text">Sahre</h1>
+          <div className="title-wrapper">
+            <h1 className="sweet-title">
+              <span data-text="Sahre">Sahre</span>
+            </h1>
+            <span className="subtitle">Real-time meeting intelligence</span>
+          </div>
         </div>
 
         {/* Main Input Area */}

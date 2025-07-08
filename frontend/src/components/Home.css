@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Exo+2:wght@300;700;900&display=swap");
+
 .home-container {
   min-height: 100vh;
   width: 100%;
@@ -21,6 +23,55 @@
 .logo-container {
   text-align: center;
   margin-bottom: 20px;
+}
+
+.title-wrapper {
+  display: grid;
+  align-items: center;
+  justify-content: center;
+  transform: skew(0, 0deg);
+}
+
+.subtitle {
+  order: 3;
+  text-align: center;
+  display: block;
+  color: #fff;
+  font-size: clamp(1rem, 3vw, 1.2rem);
+  font-family: "Exo 2", sans-serif;
+  font-style: italic;
+  margin-top: 1rem;
+  opacity: 0.9;
+}
+
+.sweet-title {
+  order: 2;
+  color: #ffffff;
+  font-weight: 900;
+  font-family: "Exo 2", sans-serif;
+  text-transform: uppercase;
+  font-size: clamp(3rem, 10vw, 6rem);
+  line-height: 0.75em;
+  text-align: center;
+  margin: 0;
+  text-shadow: 3px 1px 1px #666666, 2px 2px 1px #333333, 4px 2px 1px #666666,
+    3px 3px 1px #333333, 5px 3px 1px #666666, 4px 4px 1px #333333,
+    6px 4px 1px #666666, 5px 5px 1px #333333, 7px 5px 1px #666666,
+    6px 6px 1px #333333, 8px 6px 1px #666666, 7px 7px 1px #333333,
+    9px 7px 1px #666666;
+}
+
+.sweet-title span {
+  display: block;
+  position: relative;
+}
+
+.sweet-title span:before {
+  content: attr(data-text);
+  position: absolute;
+  text-shadow: 2px 2px 1px #888888, -1px -1px 1px #555555,
+    -2px 2px 1px #888888, 1px -1px 1px #777777;
+  z-index: 1;
 }
 
 .logo-text {
