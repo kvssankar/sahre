@@ -1,143 +1,70 @@
-## Problem Statement
-set NODE_OPTIONS=--openssl-legacy-provider
+# Getting Started with Create React App
 
-**AI-Driven Live Call Insights:**  
-Sales and support teams struggle to provide real-time, context-aware responses during live customer calls. Manual note-taking and delayed follow-ups lead to missed opportunities and inconsistent customer experiences.
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-**Scope:**  
-We address real-time transcription of live calls, instant retrieval of relevant insights from pre-trained sales data, and dynamic suggestion cards to assist agents during the call.
+## Available Scripts
 
----
+In the project directory, you can run:
 
-## Solution Approach
+### `npm start`
 
-**Proposed Solution:**  
-A GenAI-powered platform that streams live audio from the frontend (React) to a Node.js backend, transcribes speech in real-time using AWS Transcribe, and provides actionable insights using Retrieval-Augmented Generation (RAG) with OpenSearch and Bedrock Claude Sonnet 4.
+Runs the app in the development mode.\
+Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
-**Key Features:**
-- Real-time speech-to-text transcription (AWS Transcribe Streaming)
-- Dynamic suggestion cards based on sales scenarios (RAG)
-- WebSocket-based low-latency communication
-- Scalable, stateless backend (Dockerized, deployable on EC2/Fargate)
-- Frontend deployed on S3 for demo (can scale via CloudFront)
+The page will reload when you make changes.\
+You may also see any lint errors in the console.
 
-**Scope of Scaling:**
-- **Horizontal:** Add more backend containers (EC2/Fargate) to handle more concurrent calls.
-- **Vertical:** Increase instance size for higher throughput (CPU/RAM) as needed.
+### `npm test`
 
----
+Launches the test runner in the interactive watch mode.\
+See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-## Techstack Selection
+### `npm run build`
 
-- **Frontend:** React (TypeScript) – rapid UI development, component reusability
-- **Backend:** Node.js (ESM) – async streaming, easy AWS SDK integration
-- **WebSocket:** For real-time, bidirectional audio and data transfer
-- **AWS Services:**
-  - **Transcribe Streaming:** Real-time speech-to-text
-  - **Bedrock (Claude Sonnet 4):** Advanced GenAI for RAG and summarization
-  - **OpenSearch Serverless:** Vector database for fast semantic search (RAG)
-  - **S3:** Static frontend hosting
-  - **EC2/Fargate:** Backend compute (Dockerized for portability)
-- **Vector DB:** OpenSearch (serverless) – scalable, managed, integrates with Bedrock
-- **Why this stack?**  
-  - Fully managed, scalable, and secure AWS services
-  - Real-time streaming and GenAI integration
-  - Minimal ops overhead, easy to extend for production
+Builds the app for production to the `build` folder.\
+It correctly bundles React in production mode and optimizes the build for the best performance.
 
----
+The build is minified and the filenames include the hashes.\
+Your app is ready to be deployed!
 
-## Architecture Design/Diagram
+See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
 
-**Flow:**
-1. User uploads/streams audio via React frontend.
-2. Audio is chunked and sent over WebSocket to Node.js backend.
-3. Backend buffers audio, converts to PCM, and streams to AWS Transcribe.
-4. Transcribe returns real-time transcripts.
-5. Backend queries OpenSearch (vector DB) with transcript for relevant sales insights.
-6. Bedrock Claude Sonnet 4 generates suggestion cards (RAG).
-7. Suggestions and transcripts are sent back to frontend via WebSocket.
+### `npm run eject`
 
-**Diagram:**  
-*(Add a diagram with these components: User → React (S3) → WebSocket → Node.js (EC2/Fargate) → AWS Transcribe → OpenSearch → Bedrock → Node.js → WebSocket → React)*
+**Note: this is a one-way operation. Once you `eject`, you can't go back!**
 
----
+If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
 
-## Implementation Plan
+Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
 
-| Phase            | Tasks                                                                 | Timeline      |
-|------------------|-----------------------------------------------------------------------|--------------|
-| 1. Setup         | AWS account, S3, EC2, OpenSearch, Bedrock, Transcribe                | Day 1        |
-| 2. Frontend      | React UI for audio upload/stream, WebSocket integration               | Day 2-3      |
-| 3. Backend       | Node.js server, audio chunking, ffmpeg conversion, WebSocket logic    | Day 3-4      |
-| 4. Transcription | Integrate AWS Transcribe streaming                                    | Day 4        |
-| 5. RAG           | Ingest sales data into OpenSearch, connect Bedrock Claude             | Day 5        |
-| 6. Suggestion UI | Dynamic cards, transcript display                                     | Day 6        |
-| 7. Testing       | End-to-end dry runs, error handling, edge cases                       | Day 7        |
-| 8. Deployment    | Dockerize backend, deploy to EC2, frontend to S3                      | Day 8        |
+You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
 
----
+## Learn More
 
-## Cost Estimates
+You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
-- **AWS Transcribe Streaming:** ~$0.0004 per second
-- **Bedrock Claude Sonnet 4:** Pay-per-use (see [Bedrock pricing](https://aws.amazon.com/bedrock/pricing/))
-- **OpenSearch Serverless:** ~$0.10 per GB storage/month + compute
-- **EC2 (t3.medium for demo):** ~$30/month (or use Fargate for auto-scaling)
-- **S3 (frontend):** ~$1/month (static hosting)
-- **Total (demo scale):** ~$50–$100/month
+To learn React, check out the [React documentation](https://reactjs.org/).
 
----
+### Code Splitting
 
-## Impact Potential & Limitations
+This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
 
-**Potential Impact:**
-- Faster, more consistent sales/support calls
-- Improved agent productivity and customer satisfaction
-- Scalable to any domain with new data
+### Analyzing the Bundle Size
 
-**Benefits:**
-- Real-time, actionable insights
-- Easy integration with existing call workflows
-- Cloud-native, scalable, and secure
+This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
 
-**Dependencies:**
-- AWS managed services (Transcribe, Bedrock, OpenSearch)
-- Node.js, React, WebSocket, ffmpeg
+### Making a Progressive Web App
 
-**Limitations:**
-- Latency depends on network and AWS service response
-- Bedrock Claude Sonnet 4 may have usage limits or region restrictions
-- Audio quality and accents may affect transcription accuracy
+This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
 
----
+### Advanced Configuration
 
-## Ethical & Security Considerations
+This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
 
-- **Data Privacy:** All audio and transcripts are processed in-memory and not stored long-term.
-- **Security:** WebSocket connections are authenticated (add JWT/Auth for prod), backend is isolated in VPC.
-- **Ethics:** Only use customer data with consent; comply with GDPR/CCPA.
-- **Bias:** Claude Sonnet 4 is a general model; ensure prompt engineering to avoid biased suggestions.
+### Deployment
 
----
+This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
 
-## Video Pitch & Demo
+### `npm run build` fails to minify
 
-- **[Insert your shareable video link here]**
-- In the video, show:
-  - Live call simulation (audio upload/stream)
-  - Real-time transcript and suggestion cards
-  - Architecture diagram and flow explanation
-
----
-
-## Suggestions for Additional AWS Services
-
-- **Amazon Comprehend:** For sentiment analysis or entity extraction on transcripts.
-- **Amazon Kinesis:** For large-scale, multi-user audio streaming.
-- **Amazon Cognito:** For user authentication and access control.
-- **CloudWatch:** For monitoring and logging.
-- **API Gateway + Lambda:** For serverless backend scaling (if moving away from EC2).
-
----
-
-Let me know if you need a PPT-ready version or a diagram template!
+This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
