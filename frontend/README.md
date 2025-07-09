@@ -1,4 +1,6 @@
-# Getting Started with Create React App
+## Problem Statement
+set NODE_OPTIONS=--openssl-legacy-provider
+$env:NODE_OPTIONS="--openssl-legacy-provider"
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
