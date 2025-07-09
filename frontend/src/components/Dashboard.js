@@ -227,22 +227,26 @@ const Dashboard = () => {
               Click and start and wait for transcription
             </div>
           ) : (
-            transcripts.map((transcript, index) => (
-              <div
-                key={index}
-                className={`transcript-item ${
-                  transcript.isFinal ? "final" : "interim"
-                }`}
-              >
-                {transcript.speaker && (
-                  <span className="speaker-name">{transcript.speaker}: </span>
-                )}
-                <span className="transcript-text">{transcript.text}</span>
-                <span className="transcript-status">
-                  {transcript.isFinal ? "📝" : "…"}
-                </span>
-              </div>
-            ))
+            transcripts.map((transcript, index) =>
+              transcript.isFinal ? (
+                <div
+                  key={index}
+                  className={`transcript-item ${
+                    transcript.isFinal ? "final" : "interim"
+                  }`}
+                >
+                  {transcript.speaker && (
+                    <span className="speaker-name">{transcript.speaker}: </span>
+                  )}
+                  <span className="transcript-text">{transcript.text}</span>
+                  <span className="transcript-status">
+                    {transcript.isFinal ? "📝" : "…"}
+                  </span>
+                </div>
+              ) : (
+                <></>
+              )
+            )
           )}
         </div>
       </div>
