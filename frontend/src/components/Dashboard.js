@@ -1,5 +1,4 @@
 import React, { useRef, useState } from "react";
-import { Card } from "@radix-ui/themes";
 import "./Dashboard.css";
 
 const Dashboard = () => {
@@ -203,7 +202,7 @@ const Dashboard = () => {
             <div className="empty-state">Nothing yet</div>
           ) : (
             suggestions.map((suggestion, index) => (
-              <Card key={index} className="suggestion-card">
+              <div key={index} className="custom-card suggestion-card">
                 {suggestion.trigger && (
                   <div className="suggestion-trigger">
                     Suggestion for:{" "}
@@ -212,7 +211,7 @@ const Dashboard = () => {
                 )}
                 <h4 className="suggestion-title">{suggestion.title}</h4>
                 <p className="suggestion-content">{suggestion.content}</p>
-              </Card>
+              </div>
             ))
           )}
         </div>

@@ -3,10 +3,12 @@
 .dashboard-container {
   display: flex;
   height: 100vh;
+  max-height: 100vh;
   width: 100%;
   background: #000000;
   font-family: "Exo 2", sans-serif;
   overflow-x: hidden;
+  overflow-y: hidden;
 }
 
 /* Left Column - 40% */
@@ -18,10 +20,17 @@
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  max-height: 100vh;
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.left-column::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .recording-section {
-  height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -127,8 +136,6 @@
   padding: 16px;
   border-radius: 8px;
   border: 1px solid #333333;
-  height: 200px;
-  overflow-y: auto;
   color: #cccccc;
   font-size: 12px;
 }
@@ -147,6 +154,14 @@
   padding: 32px 16px;
   border-right: 1px solid #333333;
   box-sizing: border-box;
+  max-height: 100vh;
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.middle-column::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .middle-column .section-title {
@@ -157,8 +172,15 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  height: calc(100vh - 120px);
-  overflow-y: auto;
+}
+
+.custom-card {
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
 }
 
 .suggestion-card {
@@ -173,6 +195,7 @@
   background: #222222;
   border-color: #444444;
   transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
 }
 
 .suggestion-trigger {
@@ -214,6 +237,14 @@
   background: #000000;
   padding: 32px 16px;
   box-sizing: border-box;
+  max-height: 100vh;
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.right-column::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .right-column .section-title {
@@ -221,8 +252,6 @@
 }
 
 .transcripts-container {
-  height: calc(100vh - 120px);
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -281,7 +310,8 @@
 @media (max-width: 768px) {
   .dashboard-container {
     flex-direction: column;
-    height: auto;
+    height: 100vh;
+    overflow-y: auto;
     overflow-x: hidden;
   }
   
@@ -290,9 +320,9 @@
   .right-column {
     flex: none;
     width: 100%;
-    height: auto;
-    min-height: 50vh;
+    max-height: none;
     padding: 20px 16px;
+    overflow-y: visible;
   }
   
   .mic-button {
