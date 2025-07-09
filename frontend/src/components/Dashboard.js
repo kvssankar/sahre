@@ -19,49 +19,116 @@ const Dashboard = () => {
     setLlmEvals([]);
     setSummary("The conversation has just started.");
 
-    wsRef.current = new WebSocket("ws://localhost:8080");
-    wsRef.current.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "suggestions") {
-        setSuggestions((prev) => [...prev, ...data.suggestions]);
-      } else if (data.type === "llm_eval") {
-        setLlmEvals((prev) => [...prev, data.llm]);
-      } else if (data.type === "summary") {
-        setSummary(data.summary);
-      } else if (data.transcript !== undefined) {
-        setTranscripts((prev) => [
-          ...prev,
-          {
-            text: data.transcript,
-            isFinal: data.isFinal,
-            speaker: data.speaker,
-          },
-        ]);
-      }
-    };
+    try {
+      console.log("🔗 Connecting to WebSocket...");
+      wsRef.current = new WebSocket("ws://localhost:8080");
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    streamRef.current = stream;
-    audioContextRef.current = new (window.AudioContext ||
-      window.webkitAudioContext)({ sampleRate: 8000 });
-    const source = audioContextRef.current.createMediaStreamSource(stream);
-    const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1);
+      wsRef.current.onopen = () => {
+        console.log("✅ WebSocket connected successfully");
+      };
 
-    processor.onaudioprocess = (e) => {
-      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-      const input = e.inputBuffer.getChannelData(0);
-      const pcm = new Int16Array(input.length);
-      for (let i = 0; i < input.length; i++) {
-        let s = Math.max(-1, Math.min(1, input[i]));
-        pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-      }
-      wsRef.current.send(pcm.buffer);
-    };
+      wsRef.current.onclose = (event) => {
+        console.log("🔴 WebSocket closed:", event.code, event.reason);
+      };
 
-    source.connect(processor);
-    processor.connect(audioContextRef.current.destination);
-    processorRef.current = processor;
-    setRecording(true);
+      wsRef.current.onerror = (error) => {
+        console.error("❌ WebSocket error:", error);
+      };
+
+      wsRef.current.onmessage = (event) => {
+        console.log("📨 Received message:", event.data);
+        try {
+          const data = JSON.parse(event.data);
+          console.log("📦 Parsed data:", data);
+
+          if (data.type === "suggestions") {
+            console.log("💡 Adding suggestions:", data.suggestions);
+            setSuggestions((prev) => [...prev, ...data.suggestions]);
+          } else if (data.type === "llm_eval") {
+            console.log("🧠 Adding LLM eval:", data.llm);
+            setLlmEvals((prev) => [...prev, data.llm]);
+          } else if (data.type === "summary") {
+            console.log("📋 Updating summary:", data.summary);
+            setSummary(data.summary);
+          } else if (data.transcript !== undefined) {
+            console.log("📝 Adding transcript:", {
+              text: data.transcript,
+              isFinal: data.isFinal,
+              speaker: data.speaker,
+            });
+            setTranscripts((prev) => [
+              ...prev,
+              {
+                text: data.transcript,
+                isFinal: data.isFinal,
+                speaker: data.speaker,
+              },
+            ]);
+          } else {
+            console.log("❓ Unknown message type:", data);
+          }
+        } catch (parseError) {
+          console.error(
+            "❌ Error parsing message:",
+            parseError,
+            "Raw data:",
+            event.data
+          );
+        }
+      };
+
+      console.log("🎤 Requesting microphone access...");
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      console.log("✅ Microphone access granted");
+
+      console.log("🔊 Setting up audio context...");
+      audioContextRef.current = new (window.AudioContext ||
+        window.webkitAudioContext)({ sampleRate: 8000 });
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      const processor = audioContextRef.current.createScriptProcessor(
+        4096,
+        1,
+        1
+      );
+
+      processor.onaudioprocess = (e) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          console.log(
+            "⚠️ WebSocket not ready, state:",
+            wsRef.current?.readyState
+          );
+          return;
+        }
+
+        const input = e.inputBuffer.getChannelData(0);
+        const pcm = new Int16Array(input.length);
+        for (let i = 0; i < input.length; i++) {
+          let s = Math.max(-1, Math.min(1, input[i]));
+          pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+        }
+
+        try {
+          wsRef.current.send(pcm.buffer);
+          // Log every 100th audio packet to avoid spam
+          if (Math.random() < 0.01) {
+            console.log("🎵 Sending audio data, buffer size:", pcm.length);
+          }
+        } catch (sendError) {
+          console.error("❌ Error sending audio:", sendError);
+        }
+      };
+
+      source.connect(processor);
+      processor.connect(audioContextRef.current.destination);
+      processorRef.current = processor;
+      console.log("✅ Audio processing started");
+
+      setRecording(true);
+    } catch (error) {
+      console.error("❌ Error starting recording:", error);
+      setRecording(false);
+    }
   };
 
   const stopRecording = () => {
