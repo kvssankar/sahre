@@ -190,24 +190,40 @@
   left: 0;
   width: 4px;
   height: 100%;
-  background: linear-gradient(to bottom, #666, #333);
-  opacity: 0.7;
+  background: linear-gradient(to bottom, #3b82f6, #1d4ed8);
+  opacity: 0.9;
+  border-radius: 2px 0 0 2px;
 }
 
 .custom-card:hover::before {
-  background: linear-gradient(to bottom, #888, #555);
+  background: linear-gradient(to bottom, #60a5fa, #2563eb);
+  opacity: 1;
 }
 
 .suggestion-card {
-  background: #1a1a1a;
+  background: linear-gradient(to bottom, #1e293b, #0f172a);
   padding: 20px 20px 20px 24px; /* Extra padding on left for the gradient bar */
   border-radius: 12px;
-  border: 1px solid #333333;
+  border: 1px solid #334155;
   transition: all 0.3s ease;
+  margin-bottom: 16px;
+  animation: fadeIn 0.5s ease-in-out;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .suggestion-card:hover {
-  background: #222222;
+  background: linear-gradient(to bottom, #252525, #222222);
   border-color: #444444;
   transform: translateY(-2px);
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
@@ -215,21 +231,29 @@
 
 .suggestion-trigger {
   font-size: 12px;
-  color: #888888;
+  color: #94a3b8;
   margin-bottom: 8px;
   font-weight: 500;
+  display: inline-block;
+  background-color: rgba(30, 41, 59, 0.7);
+  padding: 4px 8px;
+  border-radius: 4px;
 }
 
 .trigger-text {
   font-style: italic;
-  color: #aaaaaa;
+  color: #cbd5e1;
+  font-weight: 600;
 }
 
 .suggestion-title {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   color: #ffffff;
-  margin: 0 0 8px 0;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #334155;
+  letter-spacing: 0.01em;
 }
 
 .suggestion-content {
@@ -237,6 +261,31 @@
   color: #cccccc;
   line-height: 1.4;
   margin: 0;
+}
+
+.suggestion-point {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  background-color: rgba(30, 41, 59, 0.4);
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.suggestion-point:hover {
+  background-color: rgba(30, 41, 59, 0.7);
+}
+
+.suggestion-point:last-child {
+  margin-bottom: 0;
+}
+
+.bullet {
+  color: #60a5fa;
+  margin-right: 8px;
+  font-size: 16px;
+  line-height: 1;
 }
 
 .empty-state {
