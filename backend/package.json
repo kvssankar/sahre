@@ -1,4 +1,30 @@
 {
+  "name": "ai-live-call-insights-backend",
+  "version": "2.0.0",
+  "description": "Modular real-time transcription and AI-powered suggestion system for live customer support conversations",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "env-cmd -f .env node server.js",
+    "dev": "env-cmd -f .env node --inspect server.js",
+    "test": "node test.js",
+    "test:modules": "node test.js",
+    "lint": "echo 'Linting would go here'",
+    "check-env": "node -e \"import('./config/environment.js').then(() => console.log('✅ Environment configuration valid'))\""
+  },
+  "keywords": [
+    "ai",
+    "transcription",
+    "websocket",
+    "real-time",
+    "customer-support",
+    "aws-transcribe",
+    "claude",
+    "rag",
+    "vector-search"
+  ],
+  "author": "Sahre Team",
+  "license": "ISC",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.55.1",
     "@aws-sdk/client-polly": "^3.835.0",
@@ -14,15 +40,7 @@
     "pdf-parse": "^1.1.1",
     "ws": "^8.13.0"
   },
-  "name": "hack",
-  "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "start": "env-cmd -f .env node server.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "type": "module"
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
