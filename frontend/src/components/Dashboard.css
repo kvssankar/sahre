@@ -299,6 +299,59 @@
   border: 1px dashed #333;
 }
 
+/* New card styling - keeps current appearance */
+.suggestion-card.new-card {
+  background: linear-gradient(to bottom, #1e293b, #0f172a);
+  border: 1px solid #334155;
+}
+
+.suggestion-card.new-card:hover {
+  background: linear-gradient(to bottom, #252525, #222222);
+  border-color: #444444;
+}
+
+/* Old card styling - blackish appearance */
+.suggestion-card.old-card {
+  background: linear-gradient(to bottom, #0a0a0a, #000000);
+  border: 1px solid #1a1a1a;
+  opacity: 0.8;
+}
+
+.suggestion-card.old-card:hover {
+  background: linear-gradient(to bottom, #1a1a1a, #0f0f0f);
+  border-color: #2a2a2a;
+  opacity: 0.9;
+}
+
+.suggestion-card.old-card .suggestion-title {
+  color: #ffffff;
+}
+
+.suggestion-card.old-card .suggestion-content {
+  color: #cccccc;
+}
+
+.suggestion-card.old-card .suggestion-trigger {
+  background-color: rgba(10, 10, 10, 0.7);
+  color: #94a3b8;
+}
+
+.suggestion-card.old-card .trigger-text {
+  color: #cbd5e1;
+}
+
+.suggestion-card.old-card .suggestion-point {
+  background-color: rgba(10, 10, 10, 0.4);
+}
+
+.suggestion-card.old-card .suggestion-point:hover {
+  background-color: rgba(10, 10, 10, 0.7);
+}
+
+.suggestion-card.old-card .bullet {
+  color: #60a5fa;
+}
+
 /* Right Column - 30% */
 .right-column {
   flex: 0 0 30%;
