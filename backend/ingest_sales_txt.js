@@ -6,7 +6,7 @@ import { BedrockEmbeddings } from "@langchain/aws";
 dotenv.config({ path: path.resolve(".env") });
 
 async function main() {
-  const filePath = path.resolve("E:/Github/sahre/assets/heythere.txt");
+  const filePath = path.resolve("E:/Github/sahre/assets/callcenter.txt");
   const text = fs.readFileSync(filePath, "utf-8");
   const chunkSize = 1000;
   const chunks = [];
@@ -29,7 +29,7 @@ async function main() {
     path.resolve("heythere_vectors.json"),
     JSON.stringify(embeddings)
   );
-  console.log("Saved embeddings to backend/heythere_vectors.json");
+  console.log("Saved embeddings to backend/callcenter_vectors.json");
 }
 
 main();

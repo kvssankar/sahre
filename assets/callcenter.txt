@@ -1,0 +1,154 @@
+Password Reset Procedures
+Common Password Reset Issues:
+Email delivery problems account for 60% of password reset failures
+Corporate email systems often block automated emails from external domains
+Users frequently forget to check spam/junk folders
+Password reset links expire after 24 hours
+Troubleshooting Steps:
+1.
+Verify email address spelling and domain
+2.
+Check spam/junk folders
+3.
+Confirm corporate email security settings
+4.
+Offer manual password reset via phone verification
+5.
+For repeated issues, escalate to technical team
+Manual Password Reset Process:
+Verify customer identity with account information
+Generate temporary password: Format CloudSync + current year + !
+Customer must change password on first login
+Document manual reset in customer support ticket
+Account Access Issues
+Common Login Problems:
+Browser cache and cookies cause 40% of login failures
+Two-factor authentication setup issues
+Account lockouts after multiple failed attempts
+VPN and firewall blocking connections
+Resolution Steps:
+1.
+Clear browser cache and cookies
+2.
+Try incognito/private browsing mode
+3.
+Check firewall and VPN settings
+4.
+Verify two-factor authentication setup
+5.
+Temporary account unlock for legitimate users
+Billing and Pricing Information
+CloudSync Pricing Tiers:
+Starter Plan
+: $10/user/month - Up to 10 users, basic features
+Standard Plan
+: $25/user/month - Up to 50 users, advanced reporting
+Professional Plan
+: $35/user/month - Up to 200 users, security features
+Enterprise Plan
+: Custom pricing - Unlimited users, dedicated support
+Billing Policy:
+Monthly billing on the 1st of each month
+Pro-rated charges for mid-month user additions
+Automatic tier upgrades based on user count
+30-day advance notice for price changes
+Service credits available for downtime over 99.5% SLA
+Price Change Scenarios:
+User count increases trigger automatic tier upgrades
+Annual plan renewals may include price adjustments
+Feature additions require plan upgrades
+Enterprise customers receive 30-day price change notice
+Customer Retention Strategies
+Escalation Indicators:
+Mentions of competitors or switching services
+Repeated issues within short timeframe
+Threats to cancel subscription
+Expressions of significant frustration
+Retention Responses:
+1.
+Acknowledge problems and apologize sincerely
+2.
+Take immediate ownership of issues
+3.
+Offer concrete solutions with timelines
+4.
+Provide service credits for inconvenience
+5.
+Escalate to technical team for permanent fixes
+6.
+Schedule follow-up calls to ensure resolution
+Service Credit Guidelines:
+Up to 50% credit for service disruptions
+Full month credit for repeated critical issues
+Proactive credits for high-value customers
+Document all credits in customer account
+Technical Support Escalation
+Priority Levels:
+P1 Critical
+: System down, security breach, data loss
+P2 High
+: Major feature broken, multiple users affected
+P3 Medium
+: Single user issues, minor bugs
+P4 Low
+: Feature requests, general questions
+Escalation Triggers:
+Customer mentions business impact
+Repeated calls on same issue
+Technical complexity beyond first-level support
+Customer requests manager or specialist
+Response Times:
+P1 Critical: 1 hour response, 4 hour resolution
+P2 High: 4 hour response, 24 hour resolution
+P3 Medium: 24 hour response, 72 hour resolution
+P4 Low: 72 hour response, 1 week resolution
+Common Customer Pain Points
+Email Integration Issues:
+Outlook compatibility problems with newer versions
+Gmail security settings blocking connections
+Corporate email policies preventing third-party access
+IMAP/SMTP configuration errors
+Performance Concerns:
+Slow loading times during peak hours
+File sync delays with large documents
+Mobile app crashes on older devices
+Browser compatibility issues
+Security Questions:
+Data encryption standards and compliance
+Two-factor authentication setup
+Password policy requirements
+GDPR and data privacy compliance
+Competitive Analysis
+Main Competitors:
+SyncPro
+: Lower price but limited features
+CloudMaster
+: Similar features but poor support
+DataSync
+: Enterprise focus, higher complexity
+Our Advantages:
+Better customer support response times
+More intuitive user interface
+Competitive pricing with flexible tiers
+Regular feature updates and improvements
+Retention Talking Points:
+99.9% uptime SLA vs competitor's 99.5%
+24/7 customer support vs business hours only
+Free data migration assistance
+No long-term contracts required
+Communication Guidelines
+Tone and Language:
+Use empathetic language: "I understand how frustrating this is"
+Avoid technical jargon with non-technical customers
+Acknowledge customer emotions before providing solutions
+Use positive language: "I can help you with that" vs "You can't do that"
+De-escalation Phrases:
+"I completely understand your frustration"
+"Let me take care of this for you right now"
+"I'm going to make sure this gets resolved"
+"I appreciate your patience while we work through this"
+Professional Closings:
+Summarize actions taken and next steps
+Provide ticket numbers for follow-up
+Offer additional assistance
+Thank customer for their business
