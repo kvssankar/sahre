@@ -202,7 +202,12 @@ const Dashboard = () => {
             <div className="empty-state">Nothing yet</div>
           ) : (
             suggestions.map((suggestion, index) => (
-              <div key={index} className={`custom-card suggestion-card ${index === 0 ? 'new-card' : 'old-card'}`}>
+              <div
+                key={index}
+                className={`custom-card suggestion-card ${
+                  index === 0 ? "new-card" : "old-card"
+                }`}
+              >
                 {suggestion.trigger && (
                   <div className="suggestion-trigger">
                     Suggestion for:{" "}
