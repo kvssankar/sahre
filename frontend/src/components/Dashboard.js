@@ -203,106 +203,22 @@ const Dashboard = () => {
           ) : (
             suggestions.map((suggestion, index) => (
               <div key={index} className="custom-card suggestion-card">
-                {(() => {
-                  // Parse the content if it contains structured data in a specific format
-                  let extractedTrigger = suggestion.trigger;
-                  let extractedTitle = suggestion.title;
-                  let extractedContent = suggestion.content;
-
-                  // If content contains a pattern like "[Trigger Phrase: "X"]", extract it
-                  if (
-                    typeof extractedContent === "string" &&
-                    extractedContent.includes("[Trigger Phrase:")
-                  ) {
-                    const triggerMatch = extractedContent.match(
-                      /\[Trigger Phrase:\s*"([^"]+)"\]/
-                    );
-                    if (triggerMatch) {
-                      extractedTrigger = triggerMatch[1];
-                      // Remove the trigger phrase from content
-                      extractedContent = extractedContent.replace(
-                        /\[Trigger Phrase:\s*"[^"]+"\]\s*/,
-                        ""
-                      );
-                    }
-                  }
-
-                  // Extract title if content contains "Suggestion Card: Title:"
-                  if (
-                    typeof extractedContent === "string" &&
-                    extractedContent.includes("Suggestion Card: Title:")
-                  ) {
-                    const titleMatch = extractedContent.match(
-                      /Suggestion Card: Title:\s*([^\n]+)/
-                    );
-                    if (titleMatch) {
-                      extractedTitle = titleMatch[1].trim();
-                      // Remove the title from content
-                      extractedContent = extractedContent.replace(
-                        /Suggestion Card: Title:\s*[^\n]+\s*/,
-                        ""
-                      );
-                    }
-                  }
-
-                  // Extract content if it contains "Content:"
-                  if (
-                    typeof extractedContent === "string" &&
-                    extractedContent.includes("Content:")
-                  ) {
-                    const contentMatch = extractedContent.match(
-                      /Content:\s*-\s*([\s\S]+)/
-                    );
-                    if (contentMatch) {
-                      extractedContent = contentMatch[1].trim();
-                    }
-                  }
-
-                  return (
-                    <>
-                      {extractedTrigger && (
-                        <div className="suggestion-trigger">
-                          Suggestion for:{" "}
-                          <span className="trigger-text">
-                            {extractedTrigger}
-                          </span>
-                        </div>
-                      )}
-                      <h4 className="suggestion-title">{extractedTitle}</h4>
-                      <div className="suggestion-content">
-                        {extractedContent.includes("- ") ? (
-                          // If content contains bullet points with "- ", split by them
-                          extractedContent
-                            .split("- ")
-                            .filter((point) => point.trim().length > 0)
-                            .map((point, i) => (
-                              <div key={i} className="suggestion-point">
-                                <span className="bullet">•</span>
-                                <span>{point.trim().replace(/\.$/, "")}</span>
-                              </div>
-                            ))
-                        ) : extractedContent.includes(". ") ? (
-                          // Otherwise split by periods for bullet points
-                          extractedContent
-                            .split(". ")
-                            .filter((point) => point.trim().length > 0)
-                            .map((point, i) => (
-                              <div key={i} className="suggestion-point">
-                                <span className="bullet">•</span>
-                                <span>{point.trim().replace(/\.$/, "")}</span>
-                              </div>
-                            ))
-                        ) : (
-                          // Fallback for content that doesn't have clear separators
-                          <div className="suggestion-point">
-                            <span className="bullet">•</span>
-                            <span>{extractedContent}</span>
-                          </div>
-                        )}
+                {suggestion.trigger && (
+                  <div className="suggestion-trigger">
+                    Suggestion for:{" "}
+                    <span className="trigger-text">{suggestion.trigger}</span>
+                  </div>
+                )}
+                <h4 className="suggestion-title">{suggestion.title}</h4>
+                <div className="suggestion-content">
+                  {suggestion.points &&
+                    suggestion.points.map((point, i) => (
+                      <div key={i} className="suggestion-point">
+                        <span className="bullet">•</span>
+                        <span>{point}</span>
                       </div>
-                    </>
-                  );
-                })()}
+                    ))}
+                </div>
               </div>
             ))
           )}

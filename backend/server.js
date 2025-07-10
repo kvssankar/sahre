@@ -1,4 +1,8 @@
-import { TranscribeStreamingClient, StartStreamTranscriptionCommand, PartialResultsStability } from "@aws-sdk/client-transcribe-streaming";
+import {
+  TranscribeStreamingClient,
+  StartStreamTranscriptionCommand,
+  PartialResultsStability,
+} from "@aws-sdk/client-transcribe-streaming";
 import { WebSocketServer } from "ws";
 import dotenv from "dotenv";
 import path from "path";
@@ -12,57 +16,87 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+function hasCurlyBracesWithText(inputString) {
+  const regex = /\{[^{}]*}/;
+  return regex.test(inputString);
+}
+
+function extractTextWithinCurlyBraces(str) {
+  const start = str.indexOf("{");
+  if (start === -1) return null; // no opening brace
+  let depth = 0;
+  for (let i = start; i < str.length; i++) {
+    const ch = str[i];
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        // `i` now points to the matching closing brace
+        return str.slice(start, i + 1);
+      }
+    }
+  }
+  // ran out of characters => unbalanced
+  return null;
+}
+
 const SUGGESTION_SYSTEM_PROMPT = `You are an AI assistant embedded in a live conversation between two people:
 
-- The “inquirer” is a customer, stakeholder, or user who may be frustrated, confused, or asking questions.
-- The “responder” is a support or sales agent who relies on you to surface 1 quick, helpful Suggestion Card based on the message and supporting documents.
+- The "inquirer" is a customer, stakeholder, or user who may be frustrated, confused, or asking questions.
+- The "responder" is a support or sales agent who relies on you to surface 1 quick, helpful Suggestion Card based on the message and supporting documents.
 
 🎯 Your task:
-- For every user message, return exactly 1 Suggestion Card.
+- For every user message, return exactly 1 Suggestion Card in JSON format.
 - It should be short, actionable, and easy to read quickly during a live call.
 
 ✅ Guidelines:
-- Format output as:
-  [Trigger Phrase: "..."]
-  Suggestion Card:  
-  Title: [Short title]  
-  Content:
-  - [1-liner action tip]  
-  - [1-liner tone tip]  
-  - [1-liner fact or doc reference if helpful]
+- Return JSON in this exact format:
+{
+  "trigger": "exact phrase from user that triggered this suggestion",
+  "title": "Short title (under 8 words)",
+  "points": [
+    "1-liner action tip (under 12 words)",
+    "1-liner tone tip (under 12 words)", 
+    "1-liner fact or doc reference if helpful (under 12 words)"
+  ]
+}
 
-- Keep each bullet under 12 words.
-- No paragraphs, no explanations.
-- Use helpful verbs: “Acknowledge,” “Offer,” “Clarify,” “Mention,” “Share,” “Ask,” “Defer”
+- Keep each point under 12 words.
+- Use helpful verbs: "Acknowledge," "Offer," "Clarify," "Mention," "Share," "Ask," "Defer"
+- Include 2-3 points maximum per card
 
 ⚠️ Rules:
+- ONLY return valid JSON, no other text
 - Do NOT return more than one card per message
-- Do NOT use long sentences
-- Avoid generic tips like “be helpful” or “respond professionally”
+- Avoid generic tips like "be helpful" or "respond professionally"
 
-🧾 Example:
+🧾 Example JSON:
+{
+  "trigger": "Your tool completely missed 2 SLAs last month. We lost a huge contract.",
+  "title": "Calm SLA Escalation Response",
+  "points": [
+    "Acknowledge SLA breach, no deflection",
+    "Use steady tone: 'I get how serious this is'",
+    "Offer SLA report review + escalation path"
+  ]
+}
 
-[Trigger Phrase: “Your tool completely missed 2 SLAs last month. We lost a huge contract.”]  
-Suggestion Card:  
-Title: Calm SLA Escalation Response  
-Content:  
-- Acknowledge SLA breach, no deflection  
-- Use steady tone: “I get how serious this is”  
-- Offer SLA report review + escalation path
-
-Now begin.
-`;
+Now begin. Return only valid JSON.`;
 
 const vectorsPath = path.resolve("heythere_vectors.json");
 let salesVectors = [];
 if (fs.existsSync(vectorsPath)) {
   salesVectors = JSON.parse(fs.readFileSync(vectorsPath, "utf-8"));
 } else {
-  console.warn("sales_txt_vectors.json not found. Please run the ingestion script first.");
+  console.warn(
+    "sales_txt_vectors.json not found. Please run the ingestion script first."
+  );
 }
 
 function cosineSimilarity(a, b) {
-  let dot = 0, normA = 0, normB = 0;
+  let dot = 0,
+    normA = 0,
+    normB = 0;
   for (let i = 0; i < a.length; i++) {
     dot += a[i] * b[i];
     normA += a[i] * a[i];
@@ -77,11 +111,14 @@ async function getTopKRelevantChunks(query, k = 3) {
     model: "amazon.titan-embed-text-v1",
   });
   const [queryVec] = await embedder.embedDocuments([query]);
-  const scored = salesVectors.map(obj => ({
+  const scored = salesVectors.map((obj) => ({
     chunk: obj.chunk,
-    score: cosineSimilarity(queryVec, obj.vector)
+    score: cosineSimilarity(queryVec, obj.vector),
   }));
-  return scored.sort((a, b) => b.score - a.score).slice(0, k).map(s => s.chunk);
+  return scored
+    .sort((a, b) => b.score - a.score)
+    .slice(0, k)
+    .map((s) => s.chunk);
 }
 
 const transcribeClient = new TranscribeStreamingClient({
@@ -106,23 +143,26 @@ wss.on("connection", async (ws) => {
   try {
     // Use a generic query to get the most representative context (e.g., first chunk or a default question)
     const topChunks = await getTopKRelevantChunks("overview", 3);
-    const summaryPrompt = `Summarize the following knowledge base context in 2-3 sentences for a sales/support agent:\n\n${topChunks.join("\n---\n")}`;
+    const summaryPrompt = `Summarize the following knowledge base context in 2-3 sentences for a sales/support agent:\n\n${topChunks.join(
+      "\n---\n"
+    )}`;
     const ragSummaryResponse = await anthropic.messages.create({
       model: "claude-3-haiku-20240307",
       max_tokens: 256,
       temperature: 0.2,
-      system: "You are a helpful assistant that summarizes knowledge base context for sales/support agents.",
+      system:
+        "You are a helpful assistant that summarizes knowledge base context for sales/support agents.",
       messages: [
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: summaryPrompt
-            }
-          ]
-        }
-      ]
+              text: summaryPrompt,
+            },
+          ],
+        },
+      ],
     });
     ragSummary = ragSummaryResponse.content[0].text.trim();
     console.log("Precomputed RAG summary:", ragSummary);
@@ -196,7 +236,13 @@ async function streamTranscribe(ws, audioBuffer, isClosedFn, ragSummary) {
             }
 
             if (transcript && transcript.length > 0) {
-              ws.send(JSON.stringify({ transcript, isFinal: !result.IsPartial, speaker: speakerDisplay }));
+              ws.send(
+                JSON.stringify({
+                  transcript,
+                  isFinal: !result.IsPartial,
+                  speaker: speakerDisplay,
+                })
+              );
 
               if (!result.IsPartial) {
                 conversationHistory.push(`${speakerDisplay}: ${transcript}`);
@@ -220,21 +266,27 @@ Instructions:
                     model: "claude-3-haiku-20240307",
                     max_tokens: 1024,
                     temperature: 0.5,
-                    system: "You are a helpful assistant that summarizes conversations between two people. Always return only the updated summary.",
+                    system:
+                      "You are a helpful assistant that summarizes conversations between two people. Always return only the updated summary.",
                     messages: [
                       {
                         role: "user",
                         content: [
                           {
                             type: "text",
-                            text: summaryPrompt
-                          }
-                        ]
-                      }
-                    ]
+                            text: summaryPrompt,
+                          },
+                        ],
+                      },
+                    ],
                   });
                   conversationSummary = summaryResponse.content[0].text.trim();
-                  ws.send(JSON.stringify({ type: "summary", summary: conversationSummary }));
+                  ws.send(
+                    JSON.stringify({
+                      type: "summary",
+                      summary: conversationSummary,
+                    })
+                  );
                 } catch (e) {
                   console.warn("Failed to update summary:", e.message);
                 }
@@ -242,7 +294,10 @@ Instructions:
                 // Identify inquirer and responder on first two speakers
                 if (!inquirerSpeaker) {
                   inquirerSpeaker = speakerDisplay;
-                } else if (!responderSpeaker && speakerDisplay !== inquirerSpeaker) {
+                } else if (
+                  !responderSpeaker &&
+                  speakerDisplay !== inquirerSpeaker
+                ) {
                   responderSpeaker = speakerDisplay;
                 }
 
@@ -253,7 +308,6 @@ Instructions:
                   lastFinalTranscript
                 ) {
                   try {
-
                     // Use precomputed RAG summary for this connection
 
                     // Prompt 1: LLM evaluation for suggestion card trigger, and if RAG is required
@@ -267,7 +321,7 @@ Conversation Summary:
 ${conversationSummary}
 
 Recent Conversation History:
-${conversationHistory.slice(-6).join('\n')}
+${conversationHistory.slice(-6).join("\n")}
 
 Customer's Latest Message:
 ${lastFinalTranscript}
@@ -298,38 +352,48 @@ Respond ONLY in this JSON format:
                           content: [
                             {
                               type: "text",
-                              text: evalPrompt
-                            }
-                          ]
-                        }
-                      ]
+                              text: evalPrompt,
+                            },
+                          ],
+                        },
+                      ],
                     });
 
                     let evalJson = null;
                     try {
-                      const match = evalResponse.content[0].text.match(/\{[\s\S]*\}/);
+                      const match =
+                        evalResponse.content[0].text.match(/\{[\s\S]*\}/);
                       evalJson = match ? JSON.parse(match[0]) : null;
                     } catch (e) {
-                      evalJson = { ready_for_suggestions: "no", user_context: "Could not parse LLM response." };
+                      evalJson = {
+                        ready_for_suggestions: "no",
+                        user_context: "Could not parse LLM response.",
+                      };
                     }
 
-                    ws.send(JSON.stringify({
-                      type: "llm_eval",
-                      llm: {
-                        ...evalJson,
-                        trigger: lastFinalTranscript,
-                        summary: conversationSummary,
-                        history: conversationHistory.slice(-6).join('\n')
-                      }
-                    }));
+                    ws.send(
+                      JSON.stringify({
+                        type: "llm_eval",
+                        llm: {
+                          ...evalJson,
+                          trigger: lastFinalTranscript,
+                          summary: conversationSummary,
+                          history: conversationHistory.slice(-6).join("\n"),
+                        },
+                      })
+                    );
 
                     // Only call Prompt 2 if ready_for_suggestions is "yes"
+                    // Replace the existing suggestion handling section with this:
                     if (evalJson && evalJson.ready_for_suggestions === "yes") {
                       let ragContext = "";
                       if (evalJson.is_rag_required === "yes") {
                         // RAG required: Find relevant context from local vectors
                         try {
-                          const topChunks = await getTopKRelevantChunks(lastFinalTranscript, 3);
+                          const topChunks = await getTopKRelevantChunks(
+                            lastFinalTranscript,
+                            3
+                          );
                           ragContext = topChunks.join("\n---\n");
                         } catch (e) {
                           ragContext = "";
@@ -343,55 +407,106 @@ ${SUGGESTION_SYSTEM_PROMPT}
 Product and Sales Context (from knowledge base):
 ${ragSummary}
 
-${evalJson.is_rag_required === "yes" ? `Relevant Knowledge Base (RAG):\n${ragContext}\n` : ""}
+${
+  evalJson.is_rag_required === "yes"
+    ? `Relevant Knowledge Base (RAG):\n${ragContext}\n`
+    : ""
+}
 Conversation Summary:
 ${conversationSummary}
 
 Recent Conversation History:
-${conversationHistory.slice(-6).join('\n')}
+${conversationHistory.slice(-6).join("\n")}
 
 User Question (Trigger Phrase):
 ${lastFinalTranscript}
-                      `;
-                      const suggestionResponse = await anthropic.messages.create({
-                        model: "claude-sonnet-4-20250514",
-                        max_tokens: 2000,
-                        temperature: 1,
-                        system: "",
-                        messages: [
-                          {
-                            role: "user",
-                            content: [
-                              {
-                                type: "text",
-                                text: suggestionPrompt
-                              }
-                            ]
-                          }
-                        ]
-                      });
+  `;
 
-                      let suggestionText = suggestionResponse.content[0].text.trim();
-                      ws.send(JSON.stringify({
-                        type: "suggestions",
-                        suggestions: [{
+                      const suggestionResponse =
+                        await anthropic.messages.create({
+                          model: "claude-sonnet-4-20250514",
+                          max_tokens: 2000,
+                          temperature: 1,
+                          system: "",
+                          messages: [
+                            {
+                              role: "user",
+                              content: [
+                                {
+                                  type: "text",
+                                  text: suggestionPrompt,
+                                },
+                              ],
+                            },
+                          ],
+                        });
+
+                      let suggestionText =
+                        suggestionResponse.content[0].text.trim();
+
+                      // Parse the JSON response using your utility functions
+                      let suggestionJson = null;
+                      try {
+                        // Check if response has curly braces with text
+                        if (hasCurlyBracesWithText(suggestionText)) {
+                          // Extract the JSON from within curly braces
+                          const jsonString =
+                            extractTextWithinCurlyBraces(suggestionText);
+                          if (jsonString) {
+                            const parsedJson = JSON.parse(jsonString);
+
+                            // Extract only trigger, title, and points
+                            suggestionJson = {
+                              trigger:
+                                parsedJson.trigger || lastFinalTranscript,
+                              title: parsedJson.title || "Suggestion Card",
+                              points: parsedJson.points || [
+                                "No points available",
+                              ],
+                            };
+                          }
+                        }
+                      } catch (parseError) {
+                        console.warn(
+                          "Failed to parse suggestion JSON:",
+                          parseError
+                        );
+                        suggestionJson = {
+                          trigger: lastFinalTranscript,
                           title: "Suggestion Card",
-                          content: suggestionText,
-                          trigger: lastFinalTranscript
-                        }]
-                      }));
+                          points: ["Could not parse LLM response"],
+                        };
+                      }
+
+                      // Fallback if no valid JSON was extracted
+                      if (!suggestionJson) {
+                        suggestionJson = {
+                          trigger: lastFinalTranscript,
+                          title: "Suggestion Card",
+                          points: ["No valid JSON response from LLM"],
+                        };
+                      }
+
+                      ws.send(
+                        JSON.stringify({
+                          type: "suggestions",
+                          suggestions: [suggestionJson],
+                        })
+                      );
                     }
                   } catch (e) {
-                    ws.send(JSON.stringify({
-                      type: "llm_eval",
-                      llm: {
-                        ready_for_suggestions: "no",
-                        user_context: "LLM error: " + e.message,
-                        trigger: lastFinalTranscript,
-                        summary: conversationSummary,
-                        history: conversationHistory.slice(-6).join('\n')
-                      }
-                    }));
+                    ws.send(
+                      JSON.stringify({
+                        type: "llm_eval",
+                        llm: {
+                          ready_for_suggestions: "no",
+                          user_context: "LLM error: " + e.message,
+                          trigger: lastFinalTranscript,
+                          summary: conversationSummary,
+                          history: conversationHistory.slice(-6).join("\n"),
+                        },
+                      })
+                    );
                   }
                 }
 
@@ -405,7 +520,9 @@ ${lastFinalTranscript}
     }
   } catch (err) {
     if (err.code === "ERR_STREAM_PREMATURE_CLOSE") {
-      console.warn("AWS Transcribe stream closed early (likely short audio window).");
+      console.warn(
+        "AWS Transcribe stream closed early (likely short audio window)."
+      );
     } else {
       ws.send(JSON.stringify({ error: err.message }));
     }
